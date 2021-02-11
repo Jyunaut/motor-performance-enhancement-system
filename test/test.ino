@@ -14,13 +14,15 @@ int rpm         = 0;
 int motorPWM    = 0;
 bool measureRPM = false;
 
-int test = 127;
+int test = 255;
 
 void setup()
 {
-    Serial.begin(57600);
-    
-    EncoderInit();
+    Serial.begin(9600);
+
+    attachInterrupt(digitalPinToInterrupt(PIN_ENCODER), UpdateEncoder, RISING);
+    encoderVal = 0;
+
     PinInit();
 
     prevMillis = millis();
@@ -32,22 +34,22 @@ void loop()
     curMillis = millis();
     if (curMillis - prevMillis > interval) {
         prevMillis = curMillis;
-    }
 
-    digitalWrite(12, HIGH);
-    digitalWrite(13, LOW);
-    analogWrite(PIN_PWM, test);
+        digitalWrite(12, HIGH);
+        digitalWrite(13, LOW);
+        analogWrite(PIN_PWM, test);
 
-    rpm = (float)(encoderVal * 60 / ENCODERCPR);
-    if (rpm > 0) {
+        rpm = (float)(encoderVal * 60 / ENCODERCPR);
+
         Serial.print(encoderVal);
         Serial.print(" pulse / ");
         Serial.print(ENCODERCPR);
         Serial.print(" pulse per rotation * 60 seconds = ");
         Serial.print(rpm);
         Serial.println(" RPM");
+
+        encoderVal = 0;
     }
-    encoderVal = 0;
 }
 
 void PinInit()
@@ -59,14 +61,14 @@ void PinInit()
 }
 
 // Attach interrupt at hall sensor A on each rising signal
-void EncoderInit()
-{
-    attachInterrupt(digitalPinToInterrupt(PIN_ENCODER), UpdateEncoder, CHANGE);
-    encoderVal = 0;
-}
+// void EncoderInit()
+// {
+
+// }
 
 // Add encoderVal by 1 each time it detects a rising signal from hall sensor A
 void UpdateEncoder()
 {
+    Serial.print("Hello");
     encoderVal++;
 }
