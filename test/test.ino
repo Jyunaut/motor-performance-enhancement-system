@@ -13,6 +13,8 @@ int rpm = 0;
 bool measureRPM = false;
 int motorPWM = 0;
 
+// hello
+
 void setup()
 {
     Serial.begin(9600);
@@ -36,4 +38,3 @@ void loop()
         digitalWrite(13, LOW);
     }
 }
-
