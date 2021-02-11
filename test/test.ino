@@ -1,5 +1,17 @@
-#define pin_PWM     10
-#define pin_ENCODER 3
+#define pin_PWM       10
+#define pin_ENCODER   3
+#define ENCODEROUTPUT 980
+#define HALLSEN_A     3
+
+volatile long encoderVal = 0;
+
+int interval = 1000;
+long prevMillis = 0;
+long currentMillis = 0;
+
+int rpm = 0;
+bool measureRPM = false;
+int motorPWM = 0;
 
 void setup()
 {
