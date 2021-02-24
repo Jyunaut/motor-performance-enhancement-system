@@ -1,15 +1,17 @@
-#define PIN_PWM     5
-#define PIN_INA     12
-#define PIN_INB     13
-#define PIN_ENCODER 3
-#define ENCODERCPR  244.8 //980
+# 1 "c:\\Users\\Bread Martin\\Desktop\\Google Drive\\SCHOOL SHET\\MSE Capstone SP21-SU21\\Source\\test\\test.ino"
+# 1 "c:\\Users\\Bread Martin\\Desktop\\Google Drive\\SCHOOL SHET\\MSE Capstone SP21-SU21\\Source\\test\\test.ino"
+
+
+
+
+
 
 volatile long encoderVal = 0;
 
-int interval        = 500;
+int interval = 500;
 unsigned long timer = 0;
 
-int rpm      = 0;
+int rpm = 0;
 int motorPWM = 0;
 
 int dutyCycle = 255;
@@ -28,7 +30,7 @@ void loop()
         return;
 
     timer = millis();
-    rpm = (float)(encoderVal * 60 / ENCODERCPR / MillisToSec(interval));
+    rpm = (float)(encoderVal * 60 / 244.8/*980*/ / MillisToSec(interval));
 
     WriteToPins();
     SendSerialDataRPM();
@@ -37,23 +39,23 @@ void loop()
 
 void PinInit()
 {
-    pinMode(PIN_PWM, OUTPUT);
-    pinMode(PIN_INA, OUTPUT);
-    pinMode(PIN_INB, OUTPUT);
-    pinMode(PIN_ENCODER, INPUT_PULLUP);
+    pinMode(5, 0x1);
+    pinMode(12, 0x1);
+    pinMode(13, 0x1);
+    pinMode(3, 0x2);
 }
 
 // Attach interrupt at hall sensor A on each rising signal
 void EncoderInit()
 {
-    attachInterrupt(digitalPinToInterrupt(PIN_ENCODER), UpdateEncoder, RISING);
+    attachInterrupt(((3) == 2 ? 0 : ((3) == 3 ? 1 : -1)), UpdateEncoder, 3);
 }
 
 void WriteToPins()
 {
-    digitalWrite(PIN_INA, HIGH);
-    digitalWrite(PIN_INB, LOW);
-    analogWrite(PIN_PWM, dutyCycle);
+    digitalWrite(12, 0x1);
+    digitalWrite(13, 0x0);
+    analogWrite(5, dutyCycle);
 }
 
 // Add encoderVal by 1 each time the interrupt is fired
@@ -71,7 +73,7 @@ void SendSerialDataRPM()
 {
     Serial.print(encoderVal);
     Serial.print(" pulse / ");
-    Serial.print(ENCODERCPR);
+    Serial.print(244.8/*980*/);
     Serial.print(" pulse per rotation * 60 seconds = ");
     Serial.print(rpm);
     Serial.println(" RPM");
