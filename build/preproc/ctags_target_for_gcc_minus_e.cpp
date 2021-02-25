@@ -8,18 +8,18 @@
 
 volatile long encoderVal = 0;
 
-int interval = 500;
+int interval = 1000;
 unsigned long timer = 0;
 
 int rpm = 0;
 int motorPWM = 0;
 
-int dutyCycle = 255;
+int dutyCycle = 0;
 
 void setup()
 {
     Serial.begin(9600);
-
+    (*(volatile uint8_t *)(0x81)) = (*(volatile uint8_t *)(0x81)) & 248 | 2;
     PinInit();
     EncoderInit();
 }
@@ -28,10 +28,12 @@ void loop()
 {
     if (millis() - timer < interval)
         return;
+    if (dutyCycle >= 255)
+        return;
 
     timer = millis();
-    rpm = (float)(encoderVal * 60 / 244.8/*980*/ / MillisToSec(interval));
-
+    rpm = (float)(encoderVal * 60 / 244.8 /*980*/ / MillisToSec(interval));
+    dutyCycle += 1;
     WriteToPins();
     SendSerialDataRPM();
     ResetEncoder();
@@ -39,7 +41,6 @@ void loop()
 
 void PinInit()
 {
-    pinMode(5, 0x1);
     pinMode(12, 0x1);
     pinMode(13, 0x1);
     pinMode(3, 0x2);
@@ -55,7 +56,7 @@ void WriteToPins()
 {
     digitalWrite(12, 0x1);
     digitalWrite(13, 0x0);
-    analogWrite(5, dutyCycle);
+    analogWrite(10, dutyCycle);
 }
 
 // Add encoderVal by 1 each time the interrupt is fired
@@ -71,9 +72,12 @@ void ResetEncoder()
 
 void SendSerialDataRPM()
 {
+    Serial.print("Duty Cycle: ");
+    Serial.print((float)dutyCycle / 255 * 100);
+    Serial.print("\t");
     Serial.print(encoderVal);
     Serial.print(" pulse / ");
-    Serial.print(244.8/*980*/);
+    Serial.print(244.8 /*980*/);
     Serial.print(" pulse per rotation * 60 seconds = ");
     Serial.print(rpm);
     Serial.println(" RPM");
