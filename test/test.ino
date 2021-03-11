@@ -1,64 +1,54 @@
+#include <CustomPWM.h>
+
 #define PIN_PWM     10
 #define PIN_INA     12
 #define PIN_INB     13
 #define PIN_ENCODER 3
-#define ENCODERCPR  244.8 //980
 
-volatile long encoderVal = 0;
-
-int interval        = 1000;
+volatile long encoderPulseCount = 0;
 unsigned long timer = 0;
+int rpm          = 0;
+int dutyCycle    = 0;
+int frequencyPWM = 0;
 
-int rpm      = 0;
-int motorPWM = 0;
+enum OutputMode { Arduino, Excel, TEST };
 
-int dutyCycle;
+//-------------------------------------------------------------------
+//                        Motor Parameters
+//-------------------------------------------------------------------
 
+#define ENCODERCPR 244.8
+
+//-------------------------------------------------------------------
+//                           Test Modes
+//-------------------------------------------------------------------
+
+// Duty Cycle 0 to 100 -> doReverse = false
+// Duty Cycle 100 to 0 -> doReverse = true
 bool doReverse = false;
-enum OutputMode { SerialMonitor, Excel };
-OutputMode mode;
 
-void setup()
+// Serial Output to Excel -> mode = Excel
+// Serial Output to Arduino Serial Monitor -> mode = Arduino
+OutputMode mode = TEST;
+
+// Duty Cycle from 0 to 100%
+int targetDutyCycle = 100;
+
+// Time interval between measurements (ms)
+int delayTime = 1000;
+
+//-------------------------------------------------------------------
+//                        Helper Functions
+//-------------------------------------------------------------------
+
+float MillisToSec(float length)
 {
-    Serial.begin(9600);
-
-    mode = Excel;
-    doReverse = false;
-    
-    dutyCycle = doReverse ? 255 : 0;
-
-    // Change PWM frequency on Pin 10 to 3921.16 Hz
-    TCCR1B = TCCR1B & B11111000 | B00000010;
-
-    PinInit();
-    EncoderInit();
-    delay(3000);
+    return length / 1000;
 }
 
-void loop()
-{
-    if (millis() - timer < interval)
-        return;
-    if (dutyCycle <= 0 && doReverse
-        || dutyCycle >= 255 && !doReverse)
-        return;
-
-    timer = millis();
-    rpm = (float)(encoderVal * 60 / ENCODERCPR / MillisToSec(interval));
-    dutyCycle = doReverse ? dutyCycle-1 : dutyCycle+1;
-    WriteToPins();
-    switch (mode) {
-        case SerialMonitor:
-            SendSerialDataRPM_SM();
-            break;
-        case Excel:
-            SendSerialDataRPM_Excel();
-            break;
-        default:
-            return;
-    }
-    ResetEncoder();
-}
+//-------------------------------------------------------------------
+//                   Initialization Functions
+//-------------------------------------------------------------------
 
 void PinInit()
 {
@@ -67,10 +57,9 @@ void PinInit()
     pinMode(PIN_ENCODER, INPUT_PULLUP);
 }
 
-// Attach interrupt at hall sensor A on each rising signal
 void EncoderInit()
 {
-    attachInterrupt(digitalPinToInterrupt(PIN_ENCODER), UpdateEncoder, RISING);
+    attachInterrupt(digitalPinToInterrupt(PIN_ENCODER), IncrementEncoder, CHANGE);
 }
 
 void WriteToPins()
@@ -80,43 +69,95 @@ void WriteToPins()
     analogWrite(PIN_PWM, dutyCycle);
 }
 
-// Add encoderVal by 1 each time the interrupt is fired
-void UpdateEncoder()
+void setup()
 {
-    encoderVal++;
+    Serial.begin(9600);
+    
+    dutyCycle = doReverse ? targetDutyCycle : 0;
+    dutyCycle = map(dutyCycle, 0, 100, 0, 255);
+
+    PinInit();
+    EncoderInit();
+
+    InitTimersSafe();
+    SetPinFrequencySafe(PIN_PWM, frequencyPWM);
+
+    delay(5000);
+}
+
+void loop()
+{
+    if (millis() - timer < delayTime)
+        return;
+    if (dutyCycle <= 0 && doReverse
+        || dutyCycle >= targetDutyCycle && !doReverse)
+        return;
+
+    timer = millis();
+    rpm = (float)(encoderPulseCount * 60 / ENCODERCPR / MillisToSec(delayTime) / 2);
+    dutyCycle = doReverse ? dutyCycle-1 : dutyCycle+1;
+
+    WriteToPins();
+    HandleSerialData();
+    ResetEncoder();
+}
+
+void IncrementEncoder()
+{
+    encoderPulseCount++;
 }
 
 void ResetEncoder()
 {
-    encoderVal = 0;
+    encoderPulseCount = 0;
 }
 
-void SendSerialDataRPM_SM()
+void HandleSerialData()
+{
+    switch (mode) {
+        case Arduino:
+            SendSerialData_Arduino();
+            break;
+        case Excel:
+            SendSerialData_Excel();
+            break;
+        case TEST:
+            SendSerialData_TEST();
+            break;
+        default:
+            return;
+    }
+}
+
+void SendSerialData_Arduino()
 {
     Serial.print("Duty Cycle: ");
-    Serial.print((float)dutyCycle / 255 * 100);
+    Serial.print(dutyCycle);
     Serial.print("\t");
-    Serial.print(encoderVal);
+    Serial.print(encoderPulseCount);
     Serial.print(" pulse / ");
     Serial.print(ENCODERCPR);
     Serial.print(" pulse per rotation * 60 seconds = ");
     Serial.print(rpm);
     Serial.print(" RPM");
     Serial.print(rpm);
-    Serial.print((float)dutyCycle / 255 * 100);
+    Serial.println(dutyCycle);
 }
 
-void SendSerialDataRPM_Excel()
+void SendSerialData_Excel()
 {
     Serial.print("DATA,TIME,");
-    Serial.print((float)dutyCycle / 255 * 100);
+    Serial.print(dutyCycle);
     Serial.print(",");
     Serial.print(rpm);
     Serial.print(",");
-    Serial.println((float)dutyCycle / 255 * 500);
+    Serial.println(dutyCycle);
 }
 
-float MillisToSec(float length)
+void SendSerialData_TEST()
 {
-    return length / 1000;
+    Serial.print("PWM Frequency: ");
+    Serial.println(encoderPulseCount / 2);
+    frequencyPWM++;
+    SetPinFrequencySafe(PIN_PWM, frequencyPWM);
 }
