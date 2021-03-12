@@ -11,7 +11,7 @@
                 "C:\\Program Files (x86)\\Arduino\\tools\\**",
                 "C:\\Program Files (x86)\\Arduino\\hardware\\tools\\**",
                 "C:\\Program Files (x86)\\Arduino\\libraries\\**",
-                "C:\\Users\\Bread Martin\\Documents\\Arduino\\libraries\\**"
+                "C:/Users/Bread Martin/Documents/Arduino/libraries/CustomPWM"
             ],
             "defines": [
                 "ARDUINO=10800",
