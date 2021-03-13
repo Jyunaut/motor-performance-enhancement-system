@@ -6,4 +6,4 @@ The overall objective of this system is to compensate for the nonlinearities typ
 
 ## Libraries Required:
 [CustomPWM](https://drive.google.com/file/d/1kZl4b6dBvbuqZpM3YXR_VyvR6hqdwDXl/view?usp=sharing)
-A custom PWM library to adjust PWM frequencies to specific values in real time.
+An open source custom PWM library to adjust PWM frequencies to specific values in real time.
