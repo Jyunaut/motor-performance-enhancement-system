@@ -1,4 +1,6 @@
 #include <CustomPWM.h>
+#include "SendSerial.h"
+#include "Lookup.h"
 
 #define PIN_PWM          10
 #define PIN_INA          11
@@ -9,6 +11,7 @@
 
 volatile long encoderPulseCount = 0;
 volatile long PWMMeasPulseCount = 0;
+
 unsigned long timer = 0;
 float current    = 0;
 int rpm          = 0;
@@ -24,29 +27,29 @@ int frequencyPWM = 16000;
 enum MotorType  { Pololu,  DFRobot };
 enum OutputMode { Arduino, Excel };
 
-//-------------------------------------------------------------------
-//                        Motor Parameters
-//-------------------------------------------------------------------
+/* ==================================================================
+ *                         Motor Parameters
+ */
 
 // Max speed in RPM
-#define MAX_RPM 300
+const int MAX_RPM = 300;
 
 // Motor Encoder Counts Per Revolution
-#define ENCODER_CPR 224.4
+const int ENCODER_CPR = 224.4;
 
-//-------------------------------------------------------------------
-//                           Test Modes
-//-------------------------------------------------------------------
+/* ==================================================================
+ *                            Test Modes
+ */
 
 // Default: 9600
-#define BAUDRATE 9600
+const int BAUDRATE = 9600;
 
 // Different encoder calculations for Pololu and Digikey
 MotorType motor = DFRobot;
 
 // Serial Output to Excel -> mode = Excel
 // Serial Output to Arduino Serial Monitor -> mode = Arduino
-OutputMode mode = Arduino;
+OutputMode mode = Excel;
 
 // Detect RISING, FALLING or both (CHANGE) edges
 int edgeCountMode = RISING;
@@ -71,9 +74,9 @@ int dutyCycleB = 100;
 // Increment Duty Cycle by a certain percentage
 int dutyCycleStep = 1;
 
-//-------------------------------------------------------------------
-//                        Helper Functions
-//-------------------------------------------------------------------
+/* ==================================================================
+ *                        Helper Functions
+ */
 
 float MillisToSec(float length)
 {
@@ -130,9 +133,9 @@ int AdjustDelayTime()
     else                            delayTime = 1000;
 }
 
-//-------------------------------------------------------------------
-//                          Main Program
-//-------------------------------------------------------------------
+/* ==================================================================
+ *                           Main Program
+ */
 
 void PinInit()
 {
@@ -154,35 +157,6 @@ void HandleSerialData()
 {
     if      (mode == Arduino) SendSerialData_Arduino();
     else if (mode == Excel)   SendSerialData_Excel();
-}
-
-void SendSerialData_Arduino()
-{
-    Serial.print("PWM Frequency: ");
-    Serial.print(PWMMeasPulseCount * 1000 / (float)delayTime);
-    Serial.print(" Hz \t\t");
-    Serial.print("Duty Cycle: ");
-    Serial.print(dutyCycle);
-    Serial.print("% \t\t");
-    Serial.print("Motor Speed: ");
-    Serial.print(rpm);
-    Serial.print(" RPM \t\t");
-    Serial.print("Desired Motor Speed: ");
-    Serial.print((int)(dutyCycle / (float)100 * MAX_RPM));
-    Serial.print(" RPM\t\t");
-    Serial.print("Measured Current: ");
-    Serial.print(current);
-    Serial.println(" mA");
-}
-
-void SendSerialData_Excel()
-{
-    Serial.print("DATA,TIME,");
-    Serial.print(dutyCycle);
-    Serial.print(",");
-    Serial.print((int)(dutyCycle / (float)100 * MAX_RPM));
-    Serial.print(",");
-    Serial.println(rpm);
 }
 
 void setup()
