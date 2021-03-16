@@ -21,7 +21,7 @@ String testName = " ";
 float voltage    = 6;
 int frequencyPWM = 16000;
 
-enum MotorType  { Polulu,  Digikey };
+enum MotorType  { Pololu,  DFRobot };
 enum OutputMode { Arduino, Excel };
 
 //-------------------------------------------------------------------
@@ -42,7 +42,7 @@ enum OutputMode { Arduino, Excel };
 #define BAUDRATE 9600
 
 // Different encoder calculations for Pololu and Digikey
-MotorType motor = Digikey;
+MotorType motor = DFRobot;
 
 // Serial Output to Excel -> mode = Excel
 // Serial Output to Arduino Serial Monitor -> mode = Arduino
@@ -104,13 +104,13 @@ float GetRPM()
 { 
     switch (motor)
     {
-        case Digikey:
-            if (edgeCountMode == RISING) return (float)(encoderPulseCount * 60 / ENCODER_CPR / MillisToSec(delayTime));
-            if (edgeCountMode == CHANGE) return (float)(encoderPulseCount * 60 / (ENCODER_CPR / 2) / MillisToSec(delayTime));
-            break;
-        case Polulu:
+        case DFRobot:
+            if (edgeCountMode == RISING) return encoderPulseCount * 60 /  ENCODER_CPR      / MillisToSec(delayTime);
             if (edgeCountMode == CHANGE) return encoderPulseCount * 60 / (ENCODER_CPR / 2) / MillisToSec(delayTime);
+            break;
+        case Pololu:
             if (edgeCountMode == RISING) return encoderPulseCount * 60 / (ENCODER_CPR / 4) / MillisToSec(delayTime);
+            if (edgeCountMode == CHANGE) return encoderPulseCount * 60 / (ENCODER_CPR / 2) / MillisToSec(delayTime);
             break;
         default:
             return 0;
