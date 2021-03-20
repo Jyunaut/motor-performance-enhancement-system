@@ -7,7 +7,7 @@
 #define PIN_INB          12
 #define PIN_ENCODER      3
 #define PIN_PWM_MEAS     2
-#define PIN_POT          5
+#define PIN_POT          A5
 
 volatile long encoderPulseCount = 0;
 volatile long PWMMeasPulseCount = 0;
@@ -20,8 +20,8 @@ bool doneTest = false;
 bool firstMeas = true;
 String testName = " ";
 
-int voltage      = 2500; // in mV
-int frequencyPWM = 7;
+int voltage      = 4700; // in mV
+int frequencyPWM = 100;
 
 enum MotorType  { Pololu,  DFRobot };
 enum OutputMode { Arduino, Excel, Test };
@@ -32,10 +32,10 @@ enum TestMode   { Incremental, Fixed };
  */
 
 // Max speed in RPM
-const int MAX_RPM = 300;
+const int MAX_RPM = 500;
 
 // Motor Encoder Counts Per Revolution
-const int ENCODER_CPR = 224.4;
+const int ENCODER_CPR = 980;//224.4;
 
 /* ==================================================================
  *                            Test Modes
@@ -45,7 +45,7 @@ const int ENCODER_CPR = 224.4;
 const int BAUDRATE = 9600;
 
 // Different encoder calculations for Pololu and Digikey
-MotorType motor = DFRobot;
+MotorType motor = Pololu;
 
 // Excel: Serial Output to Excel
 // Arduino: Serial Output to Arduino Serial Monitor
@@ -54,7 +54,7 @@ OutputMode outputMode = Arduino;
 
 // Incremental: Increases/Decreases duty cycle by a fixed amount from dutyCycleA to dutyCycleB
 // Fixed: Maintains a requested duty cycle from the tester
-TestMode testMode = Incremental;
+TestMode testMode = Fixed;
 
 // Detect RISING, FALLING or both (CHANGE) edges
 int edgeCountMode = RISING;
@@ -73,8 +73,8 @@ bool continuousMeasurement = true;
 bool doReverse = false;
 
 // Duty Cycle from A to B
-int dutyCycleA = 10;
-int dutyCycleB = 11;
+int dutyCycleA = 0;
+int dutyCycleB = 30;
 
 // Increment Duty Cycle by a certain percentage
 int dutyCycleStep = 1;
@@ -125,17 +125,17 @@ float GetRPM()
     }
 }
 
-void SetDutyCycle()
+int GetDutyCycle()
 {
-    
+    return map(analogRead(PIN_POT), 0, 1023, 0, 100);
 }
 
 int AdjustDelayTime()
 {
     if      (rpm <= 0)              delayTime = 1000;
-    else if (rpm <= MAX_RPM * 0.10) delayTime = 8000; // 30 rpm
-    else if (rpm <= MAX_RPM * 0.19) delayTime = 3000; // 57 rpm
-    else if (rpm <= MAX_RPM * 0.5 ) delayTime = 1000;
+    //else if (rpm <= MAX_RPM * 0.10) delayTime = 8000; // 30 rpm
+    else if (rpm <= MAX_RPM * 0.15) delayTime = 3000; // 45 rpm
+    else if (rpm <= MAX_RPM * 0.25) delayTime = 2000;
     else                            delayTime = 1000;
 }
 
@@ -196,8 +196,8 @@ void loop()
         return;
 
     WriteToPins();
-    timer   = millis();
-    rpm     = GetRPM();
+    timer = millis();
+    rpm   = GetRPM();
 
     if (variableDelayTime) {
         AdjustDelayTime();
@@ -216,7 +216,8 @@ void loop()
             }
             break;
         case Fixed:
-
+            dutyCycle = GetDutyCycle();
+            dutyCycleMap = map(dutyCycle, 0, 100, 0, 255);
             break;
         default:
             Serial.println("Undefined Test Mode");
