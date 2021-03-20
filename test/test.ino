@@ -1,19 +1,18 @@
 #include <CustomPWM.h>
 #include "SendSerial.h"
-#include "Lookup.h"
+//#include "Lookup.h"
 
 #define PIN_PWM          10
 #define PIN_INA          11
 #define PIN_INB          12
 #define PIN_ENCODER      3
 #define PIN_PWM_MEAS     2
-#define PIN_CURRENT_MEAS 5
+#define PIN_POT          5
 
 volatile long encoderPulseCount = 0;
 volatile long PWMMeasPulseCount = 0;
 
 unsigned long timer = 0;
-float current    = 0;
 int rpm          = 0;
 int dutyCycle    = 0;
 int dutyCycleMap = 0;
@@ -21,11 +20,12 @@ bool doneTest = false;
 bool firstMeas = true;
 String testName = " ";
 
-float voltage    = 6;
-int frequencyPWM = 16000;
+int voltage      = 2500; // in mV
+int frequencyPWM = 7;
 
 enum MotorType  { Pololu,  DFRobot };
-enum OutputMode { Arduino, Excel };
+enum OutputMode { Arduino, Excel, Test };
+enum TestMode   { Incremental, Fixed };
 
 /* ==================================================================
  *                         Motor Parameters
@@ -47,9 +47,14 @@ const int BAUDRATE = 9600;
 // Different encoder calculations for Pololu and Digikey
 MotorType motor = DFRobot;
 
-// Serial Output to Excel -> mode = Excel
-// Serial Output to Arduino Serial Monitor -> mode = Arduino
-OutputMode mode = Excel;
+// Excel: Serial Output to Excel
+// Arduino: Serial Output to Arduino Serial Monitor
+// Test: Serial Output to Arduino for debugging purposes
+OutputMode outputMode = Arduino;
+
+// Incremental: Increases/Decreases duty cycle by a fixed amount from dutyCycleA to dutyCycleB
+// Fixed: Maintains a requested duty cycle from the tester
+TestMode testMode = Incremental;
 
 // Detect RISING, FALLING or both (CHANGE) edges
 int edgeCountMode = RISING;
@@ -61,15 +66,15 @@ bool variableDelayTime = true;
 int delayTime = 1000;
 
 // Note: Turn on continuous measurement while testing code
-bool continuousMeasurement = false;
+bool continuousMeasurement = true;
 
 // Duty Cycle 0 to 100 -> doReverse = false
 // Duty Cycle 100 to 0 -> doReverse = true
-bool doReverse = true;
+bool doReverse = false;
 
 // Duty Cycle from A to B
-int dutyCycleA = 0;
-int dutyCycleB = 100;
+int dutyCycleA = 10;
+int dutyCycleB = 11;
 
 // Increment Duty Cycle by a certain percentage
 int dutyCycleStep = 1;
@@ -120,16 +125,17 @@ float GetRPM()
     }
 }
 
-float GetCurrent()
+void SetDutyCycle()
 {
-    return analogRead(PIN_CURRENT_MEAS) / (float)140 * 1000;
+    
 }
 
 int AdjustDelayTime()
 {
-    if      (rpm <= 0)              delayTime = 500;
-    else if (rpm <= MAX_RPM * 0.25) delayTime = 3000;
-    else if (rpm <= MAX_RPM * 0.5 ) delayTime = 2000;
+    if      (rpm <= 0)              delayTime = 1000;
+    else if (rpm <= MAX_RPM * 0.10) delayTime = 8000; // 30 rpm
+    else if (rpm <= MAX_RPM * 0.19) delayTime = 3000; // 57 rpm
+    else if (rpm <= MAX_RPM * 0.5 ) delayTime = 1000;
     else                            delayTime = 1000;
 }
 
@@ -155,8 +161,10 @@ void WriteToPins()
 
 void HandleSerialData()
 {
-    if      (mode == Arduino) SendSerialData_Arduino();
-    else if (mode == Excel)   SendSerialData_Excel();
+
+    if      (outputMode == Arduino) SendSerialData_Arduino();
+    else if (outputMode == Excel)   SendSerialData_Excel();
+    else if (outputMode == Test)    SendSerialData_Test();
 }
 
 void setup()
@@ -164,9 +172,9 @@ void setup()
     Serial.begin(BAUDRATE);
 
     if (!doReverse)
-        testName = String((String)voltage + " V " + (String)frequencyPWM + " Hz " + dutyCycleA + " to " + dutyCycleB + "%");
+        testName = String((String)((float)voltage / 1000) + " V " + (String)frequencyPWM + " Hz " + dutyCycleA + " to " + dutyCycleB + "%");
     else if (doReverse)
-        testName = String((String)voltage + " V " + (String)frequencyPWM + " Hz " + dutyCycleB + " to " + dutyCycleA + "%");
+        testName = String((String)((float)voltage / 1000) + " V " + (String)frequencyPWM + " Hz " + dutyCycleB + " to " + dutyCycleA + "%");
     
     dutyCycle = doReverse ? dutyCycleB : dutyCycleA;
     dutyCycleMap = map(dutyCycle, 0, 100, 0, 255);
@@ -175,7 +183,7 @@ void setup()
     InitTimersSafe();
     SetPinFrequencySafe(PIN_PWM, frequencyPWM);
 
-    if (mode == Excel) {
+    if (outputMode == Excel) {
         Serial.print("LABEL,Time,Duty Cycle,Desired RPM,");
         Serial.println(testName);
     }
@@ -187,22 +195,32 @@ void loop()
     if (millis() - timer < delayTime)
         return;
 
-    timer = millis();
     WriteToPins();
-    rpm = GetRPM();
-    current = GetCurrent();
+    timer   = millis();
+    rpm     = GetRPM();
 
     if (variableDelayTime) {
         AdjustDelayTime();
     }
 
-    if (dutyCycle != dutyCycleA && doReverse
-        || dutyCycle != dutyCycleB && !doReverse) {
-        if (!firstMeas) {
-            dutyCycle = doReverse ? dutyCycle-dutyCycleStep : dutyCycle+dutyCycleStep;
-            dutyCycleMap = map(dutyCycle, 0, 100, 0, 255);
-        }
-        firstMeas = false;
+    switch (testMode)
+    {
+        case Incremental:
+            if (dutyCycle != dutyCycleA && doReverse
+                || dutyCycle != dutyCycleB && !doReverse) {
+                if (!firstMeas) {
+                    dutyCycle = doReverse ? dutyCycle-dutyCycleStep : dutyCycle+dutyCycleStep;
+                    dutyCycleMap = map(dutyCycle, 0, 100, 0, 255);
+                }
+                firstMeas = false;
+            }
+            break;
+        case Fixed:
+
+            break;
+        default:
+            Serial.println("Undefined Test Mode");
+            break;
     }
 
     if (continuousMeasurement){

@@ -13,4 +13,8 @@ void SendSerialData_Arduino();
  */
 void SendSerialData_Excel();
 
+/* ==================================================================
+ * Use for test logic
+ */
+void SendSerialData_Test();
 #endif

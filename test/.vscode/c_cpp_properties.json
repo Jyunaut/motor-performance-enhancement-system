@@ -11,7 +11,9 @@
                 "C:\\Program Files (x86)\\Arduino\\tools\\**",
                 "C:\\Program Files (x86)\\Arduino\\hardware\\tools\\**",
                 "C:\\Program Files (x86)\\Arduino\\libraries\\**",
-                "C:/Users/Bread Martin/Documents/Arduino/libraries/CustomPWM"
+                "C:/Users/Bread Martin/Documents/Arduino/libraries/CustomPWM",
+                "C:/Program Files (x86)/Arduino/hardware/arduino/avr/cores/arduino",
+                "C:/Users/Bread Martin/Desktop/Google Drive/SCHOOL SHET/MSE Capstone SP21-SU21/Source/test/LookupLib"
             ],
             "defines": [
                 "ARDUINO=10800",
