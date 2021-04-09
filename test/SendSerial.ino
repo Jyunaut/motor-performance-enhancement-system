@@ -4,13 +4,16 @@ extern volatile long encoderPulseCount;
 extern volatile long PWMMeasPulseCount;
 extern float current;
 extern int dutyCycle;
+extern int samplesPerInc;
 extern int delayTime;
 extern int rpm;
+extern int vPWM;
+extern int vDutyCycle;
 
 void SendSerialData_Arduino()
 {
     Serial.print("PWM Frequency: ");
-    Serial.print(PWMMeasPulseCount * (1000 / (float)delayTime));
+    Serial.print(PWMMeasPulseCount * (1000 / ((float)delayTime / samplesPerInc)));
     Serial.print(" Hz \t\t");
     Serial.print("Duty Cycle: ");
     Serial.print(dutyCycle);
@@ -21,9 +24,6 @@ void SendSerialData_Arduino()
     Serial.print("Desired Motor Speed: ");
     Serial.print((int)(dutyCycle / (float)100 * MAX_RPM));
     Serial.println(" RPM");
-    // Serial.print("Measured Current: ");
-    // Serial.print(current);
-    // Serial.println(" mA");
 }
 
 void SendSerialData_Excel()
@@ -36,13 +36,10 @@ void SendSerialData_Excel()
     Serial.println(rpm);
 }
 
-String num1;
 void SendSerialData_Test()
 {
-    Serial.println(num1);
-    if (Serial.available())
-    {
-        num1 = Serial.readStringUntil('\n');
-        Serial.println(num1);
-    }
+    Serial.print("Pot % (0-255): ");
+    Serial.print(map(vDutyCycle, 0, 100, 0, 255));
+    Serial.print("\t");
+    SendSerialData_Arduino();
 }

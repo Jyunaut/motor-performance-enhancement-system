@@ -1,41 +1,46 @@
 #include <CustomPWM.h>
 #include "SendSerial.h"
-//#include "Lookup.h"
+#include "table.h"
 
-#define PIN_PWM          10
-#define PIN_INA          11
-#define PIN_INB          12
-#define PIN_ENCODER      3
-#define PIN_PWM_MEAS     2
-#define PIN_POT          A5
+#define PIN_PWM      10
+#define PIN_VPWM     9
+#define PIN_INA      11
+#define PIN_INB      12
+#define PIN_ENCODER  3
+#define PIN_PWM_MEAS 2
+#define PIN_POT      A5
 
 volatile long encoderPulseCount = 0;
 volatile long PWMMeasPulseCount = 0;
 
-unsigned long timer = 0;
+unsigned long timer1 = 0;
+unsigned long timer2 = 0;
 int rpm          = 0;
 int dutyCycle    = 0;
+int dutyCycle_c  = 0;
 int dutyCycleMap = 0;
 bool doneTest = false;
 bool firstMeas = true;
 String testName = " ";
 
-int voltage      = 4700; // in mV
-int frequencyPWM = 100;
+int voltage      = 0; // in mV
+int vPWM         = 62500; // in Hz
+int vDutyCycle = 0;
+int frequencyPWM = 15;
 
 enum MotorType  { Pololu,  DFRobot };
 enum OutputMode { Arduino, Excel, Test };
-enum TestMode   { Incremental, Fixed };
+enum TestMode   { Incremental, Fixed, Volt };
 
 /* ==================================================================
  *                         Motor Parameters
  */
 
 // Max speed in RPM
-const int MAX_RPM = 500;
+const int MAX_RPM = 300;
 
 // Motor Encoder Counts Per Revolution
-const int ENCODER_CPR = 980;//224.4;
+const float ENCODER_CPR = 224.4;
 
 /* ==================================================================
  *                            Test Modes
@@ -45,24 +50,24 @@ const int ENCODER_CPR = 980;//224.4;
 const int BAUDRATE = 9600;
 
 // Different encoder calculations for Pololu and Digikey
-MotorType motor = Pololu;
+MotorType motor = DFRobot;
 
 // Excel: Serial Output to Excel
 // Arduino: Serial Output to Arduino Serial Monitor
 // Test: Serial Output to Arduino for debugging purposes
-OutputMode outputMode = Arduino;
+OutputMode outputMode = Test;
 
 // Incremental: Increases/Decreases duty cycle by a fixed amount from dutyCycleA to dutyCycleB
 // Fixed: Maintains a requested duty cycle from the tester
-TestMode testMode = Fixed;
+TestMode testMode = Volt;
 
 // Detect RISING, FALLING or both (CHANGE) edges
-int edgeCountMode = RISING;
+int edgeCountMode = CHANGE;
 
 // Enable this option to let measurement timing slow down for lower RPM
-bool variableDelayTime = true;
+bool variableDelayTime = false;
 
-// Time interval between measurements (ms). Only works if variableDelayTime is true
+// Time interval between measurements (ms). Only works if variableDelayTime is false
 int delayTime = 1000;
 
 // Note: Turn on continuous measurement while testing code
@@ -74,7 +79,10 @@ bool doReverse = false;
 
 // Duty Cycle from A to B
 int dutyCycleA = 0;
-int dutyCycleB = 30;
+int dutyCycleB = 100;
+
+// How many times to sample per duty cycle increment
+int samplesPerInc = 1;
 
 // Increment Duty Cycle by a certain percentage
 int dutyCycleStep = 1;
@@ -113,12 +121,12 @@ float GetRPM()
     switch (motor)
     {
         case DFRobot:
-            if (edgeCountMode == RISING) return encoderPulseCount * 60 /  ENCODER_CPR      / MillisToSec(delayTime);
-            if (edgeCountMode == CHANGE) return encoderPulseCount * 60 / (ENCODER_CPR / 2) / MillisToSec(delayTime);
+            if (edgeCountMode == RISING) return encoderPulseCount * 60 /  ENCODER_CPR      / MillisToSec(delayTime) * samplesPerInc;
+            if (edgeCountMode == CHANGE) return encoderPulseCount * 60 / (ENCODER_CPR * 2) / MillisToSec(delayTime) * samplesPerInc;
             break;
         case Pololu:
-            if (edgeCountMode == RISING) return encoderPulseCount * 60 / (ENCODER_CPR / 4) / MillisToSec(delayTime);
-            if (edgeCountMode == CHANGE) return encoderPulseCount * 60 / (ENCODER_CPR / 2) / MillisToSec(delayTime);
+            if (edgeCountMode == RISING) return encoderPulseCount * 60 / (ENCODER_CPR / 4) / MillisToSec(delayTime) * samplesPerInc;
+            if (edgeCountMode == CHANGE) return encoderPulseCount * 60 / (ENCODER_CPR / 2) / MillisToSec(delayTime) * samplesPerInc;
             break;
         default:
             return 0;
@@ -157,6 +165,7 @@ void WriteToPins()
     digitalWrite(PIN_INA, HIGH);
     digitalWrite(PIN_INB, LOW);
     pwmWrite(PIN_PWM, dutyCycleMap);
+    pwmWrite(PIN_VPWM, map(vDutyCycle, 0, 100, 0, 255));
 }
 
 void HandleSerialData()
@@ -192,12 +201,29 @@ void setup()
 
 void loop()
 {
-    if (millis() - timer < delayTime)
+    if (millis() - timer2 > delayTime / samplesPerInc) {
+        rpm = GetRPM();
+        if (continuousMeasurement) {
+            HandleSerialData();
+        }
+        else if (!continuousMeasurement && !doneTest) {
+            if (dutyCycle >= dutyCycleA && doReverse
+                || dutyCycle <= dutyCycleB && !doReverse) {
+                HandleSerialData();
+                if (dutyCycle == dutyCycleA && doReverse
+                    || dutyCycle == dutyCycleB && !doReverse) {
+                        doneTest = true;
+                }
+            }
+        }
+        timer2 = millis();
+        ResetEncoder();
+        ResetPWMMeasurement();
+    }
+    if (millis() - timer1 < delayTime)
         return;
 
-    WriteToPins();
-    timer = millis();
-    rpm   = GetRPM();
+    timer1 = millis();
 
     if (variableDelayTime) {
         AdjustDelayTime();
@@ -210,7 +236,11 @@ void loop()
                 || dutyCycle != dutyCycleB && !doReverse) {
                 if (!firstMeas) {
                     dutyCycle = doReverse ? dutyCycle-dutyCycleStep : dutyCycle+dutyCycleStep;
-                    dutyCycleMap = map(dutyCycle, 0, 100, 0, 255);
+                    frequencyPWM = params[dutyCycle][1];
+                    SetPinFrequencySafe(PIN_PWM, frequencyPWM);
+                    dutyCycle_c = params[dutyCycle][2];
+                    dutyCycleMap = map(dutyCycle_c, 0, 100, 0, 255);
+                    WriteToPins();
                 }
                 firstMeas = false;
             }
@@ -218,26 +248,26 @@ void loop()
         case Fixed:
             dutyCycle = GetDutyCycle();
             dutyCycleMap = map(dutyCycle, 0, 100, 0, 255);
+            WriteToPins();
+            break;
+        case Volt: // Motor duty cycle and frequency is fixed
+            dutyCycle    = 7; // motor duty cycle %
+            frequencyPWM = 7; // motor frequency in Hz
+
+            // Fix motor PWM duty cycle
+            pwmWrite(PIN_PWM, map(dutyCycle, 0, 100, 0, 255));
+
+            // Fix motor frequency
+            SetPinFrequencySafe(PIN_PWM, frequencyPWM);
+
+            // Read potentiometer input for the VVC %
+            vDutyCycle = GetDutyCycle();
+            
+            // Set VVC duty cycle
+            pwmWrite(PIN_VPWM, map(vDutyCycle, 0, 100, 0, 255));
             break;
         default:
             Serial.println("Undefined Test Mode");
             break;
     }
-
-    if (continuousMeasurement){
-        HandleSerialData();
-    }
-    else if (!continuousMeasurement && !doneTest) {
-        if (dutyCycle >= dutyCycleA && doReverse
-            || dutyCycle <= dutyCycleB && !doReverse) {
-            HandleSerialData();
-            if (dutyCycle == dutyCycleA && doReverse
-                || dutyCycle == dutyCycleB && !doReverse) {
-                    doneTest = true;
-            }
-        }
-    }
-
-    ResetEncoder();
-    ResetPWMMeasurement();
 }
