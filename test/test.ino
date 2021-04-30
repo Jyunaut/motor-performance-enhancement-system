@@ -252,7 +252,7 @@ void loop()
             break;
         case Volt: // Motor duty cycle and frequency is fixed
             dutyCycle    = 7; // motor duty cycle %
-            frequencyPWM = 7; // motor frequency in Hz
+            frequencyPWM = 14; // motor frequency in Hz
 
             // Fix motor PWM duty cycle
             pwmWrite(PIN_PWM, map(dutyCycle, 0, 100, 0, 255));

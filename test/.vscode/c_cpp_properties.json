@@ -57,6 +57,7 @@
             "cStandard": "c11",
             "cppStandard": "c++11",
             "defines": [
+                "USBCON",
                 "F_CPU=16000000L",
                 "ARDUINO=10813",
                 "ARDUINO_AVR_UNO",
