@@ -1,5 +1,5 @@
-#ifndef SENDSERIAL_H_
-#define SENDSERIAL_H_
+#ifndef SENDSERIAL_H
+#define SENDSERIAL_H
 
 /* ==================================================================
  * Sends serial data in a format that is readable in the Arduino

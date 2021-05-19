@@ -1,5 +1,5 @@
-#ifndef _HELPER_FUNCTIONS_
-#define _HELPER_FUNCTIONS_
+#ifndef HELPER_FUNCTIONS
+#define HELPER_FUNCTIONS
 
 #include <CustomPWM.h>
 #include <Arduino.h>
