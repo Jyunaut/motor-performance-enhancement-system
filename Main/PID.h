@@ -3,36 +3,36 @@
 
 class PID
 {
-    public:
-        PID(float* input, float* output, float* setpoint,
-            float kp, float ki, float kd, int sampleTime);
+public:
+    PID(float* input, float* output, float* setpoint,
+        float kp, float ki, float kd, int sampleTime);
 
-        /* ==================================================================
-        * Returns the appropriate duty cycle based on the current position of
-        * the motor.
-        */
-        void CalculateDutyCycle();
+    /* ==================================================================
+    * Returns the appropriate duty cycle based on the current position of
+    * the motor.
+    */
+    void CalculateDutyCycle();
 
-        float GetP();
-        float GetI();
-        float GetD();
+    float GetP();
+    float GetI();
+    float GetD();
 
-    private:
-        unsigned long curTime;
-        unsigned long prevTime;
+private:
+    unsigned long curTime;
+    unsigned long prevTime;
 
-        float* input;
-        float* output;
-        float* setpoint;
-        float kp;
-        float ki;
-        float kd;
-        int sampleTime;
+    float* input;
+    float* output;
+    float* setpoint;
+    float kp;
+    float ki;
+    float kd;
+    int sampleTime;
 
-        float prevError;
-        float p_error;
-        float i_error;
-        float d_error;
+    float prevError;
+    float p_error;
+    float i_error;
+    float d_error;
 };
 
 #endif

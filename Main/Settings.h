@@ -17,54 +17,51 @@ enum TestMode   { Incremental, Fixed, Volt };
  */
 
 // Max speed in RPM
-extern int motMaxRPM;
+inline int motMaxRPM = 300;
 
 // Motor Encoder Counts Per Revolution
-extern float motCPR;
+inline float motCPR = 224.4 * 2;
 
 /* ==================================================================
  *                            Test Modes
  */
 
 // Default: 9600
-extern int baudrate;
-
-// Different encoder calculations for Pololu and Digikey
-extern MotorType motor;
+inline int baudrate = 9600;
 
 // Excel: Serial Output to Excel
 // Arduino: Serial Output to Arduino Serial Monitor
 // Test: Serial Output to Arduino for debugging purposes
-extern OutputMode outputMode;
+inline OutputMode outputMode;
 
 // Incremental: Increases/Decreases duty cycle by a fixed amount from dutyCycleA to dutyCycleB
 // Fixed: Maintains a requested duty cycle from the tester
-extern TestMode testMode;
+inline TestMode testMode;
 
 // Detect RISING, FALLING or both (CHANGE) edges
-extern int edgeCountMode;
+inline int edgeCountMode = RISING;
 
 // Enable this option to let measurement timing slow down for lower RPM
-extern bool variableDelayTime;
+inline bool variableDelayTime = false;
 
 // Time interval between measurements (ms). Only works if variableDelayTime is false
-extern int delayTime;
+inline int delayTime = 1000;
 
 // Note: Turn on continuous measurement while testing code
-extern bool continuousMeasurement;
+inline bool continuousMeasurement = true;
 
 // Duty Cycle 0 to 100 -> doReverse = false
 // Duty Cycle 100 to 0 -> doReverse = true
-extern bool doReverse;
+inline bool doReverse = false;
 
 // Duty Cycle from A to B
-extern int dutyCycleA;
-extern int dutyCycleB;
+inline int dutyCycleA = 0;
+inline int dutyCycleB = 100;
 
 // How many times to sample per duty cycle increment
-extern int samplesPerInc;
+inline int samplesPerInc = 1;
 
 // Increment Duty Cycle by a certain percentage
-extern int dutyCycleStep;
+inline int dutyCycleStep = 1;
 
 #endif

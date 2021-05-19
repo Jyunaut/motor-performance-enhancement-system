@@ -1,10 +1,6 @@
 #include "HelperFunctions.h"
 #include "Settings.h"
 
-volatile long encPulseCount     = 0;
-volatile long measPWMPulseCount = 0;
-int prevStateA = 0;
-
 float MillisToSec(float length)
 {
     return length / (float)1000;

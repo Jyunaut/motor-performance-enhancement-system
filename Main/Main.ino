@@ -2,10 +2,6 @@
 #include "Settings.h"
 #include "PID.h"
 
-extern volatile long encPulseCount;
-extern volatile long measPWMPulseCount;
-extern int prevStateA;
-
 float desPos           = 0;
 float curPos           = 0;
 float rpm              = 0;
@@ -16,7 +12,7 @@ float vvcDutyCycle     = 0;
 float vvcPWMFreq       = 0;
 float voltage          = 0;
 
-PID pid(&curPos, &motDutyCycle, &desPos, 2, 0, 0, 20);
+PID pid(&curPos, &motDutyCycle, &desPos, 2, 0.005, 0, 20);
 
 void WriteToPins()
 {
