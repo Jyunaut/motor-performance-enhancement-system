@@ -27,10 +27,8 @@ void PID::CalculateDutyCycle()
 
     *output = kp*p_error + ki*i_error + kd*d_error;
 
-    if (*output > 255)
-        *output = 255;
-    else if (*output < -255)
-        *output = -255;
+    if      (*output >  255) *output =  255;
+    else if (*output < -255) *output = -255;
 
     delay(sampleTime);
 }
