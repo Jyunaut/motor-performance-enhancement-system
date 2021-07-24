@@ -1,6 +1,6 @@
 {
-    "sketch": "Main\\Main.ino",
+    "sketch": "NCMain\\NCMain.ino",
     "board": "arduino:avr:uno",
-    "port": "COM12",
+    "port": "COM14",
     "output": "C:/Users/Bread Martin/Desktop/Google Drive/SCHOOL SHET/MSE Capstone SP21-SU21/Source/build"
 }

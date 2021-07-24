@@ -5,11 +5,11 @@
 #include "Table.h"
 
 const float ANALOG_TO_PERCENT = 100 / (float)255;
-const bool COMPENSATION = true;
-const int TOLERANCE = 1; // In Degrees
+const bool COMPENSATION = false;
+const int TOLERANCE = 0; // In Degrees
 
-//0.4,0,0
-const float K_P = 0.4, K_I = 0, K_D = 0;
+//3.5,0.001,0.05
+const float K_P = 6, K_I = 0.0000, K_D = 0;
 
 // Position and speed values
 int   desPos           = 0;
@@ -23,7 +23,7 @@ float motDutyCycle     = 0;
 float motVoltage       = 0;
 int   motPWMFreq       = 0;
 int   motDutyCycleComp = 0;
-int test = 25;
+int test = 270;
 PID pid(&curPosCPR, &motDutyCycle, &desPosCPR, K_P, K_I, K_D, samplingRate);
 
 void WriteToPins()
@@ -85,16 +85,14 @@ void Compensate()
 
 void PrintStuff()
 {
-// //    Serial.print("Time: ");          Serial.print(MillisToSec(millis()));            Serial.print("\t\t");
-//     Serial.print("Desired Angle: "); Serial.print(desPos);                           Serial.print("\t\t");
-//     Serial.print("Angle: ");         Serial.print(curPos);                           Serial.print("\t\t");
-//     Serial.print("Duty Cycle %: ");  Serial.print(motDutyCycle * ANALOG_TO_PERCENT); Serial.print("\t\t");
-// //    Serial.print("Voltage: ");       Serial.print(motVoltage);                       Serial.print("\t\t");
-//     Serial.print("PWM Frequency: "); Serial.print(motPWMFreq);                       Serial.print("\t\t");
-//     Serial.print("Compensated Duty Cycle %: "); Serial.println(motDutyCycleComp);
-   Serial.print(desPos);
-   Serial.print("\t");
-   Serial.println(curPos);
+//    Serial.print("DATA,TIME,");
+//    Serial.print(desPos);
+//    Serial.print(",");
+//    Serial.println(curPos);
+    
+    Serial.print(desPos);
+    Serial.print("\t");
+    Serial.println(curPos);
 }
 
 void setup()
@@ -107,6 +105,14 @@ void setup()
 
     encPulseCount = EEPROM.read(0);
 
+//    encPulseCount = 0;
+//    desPos = 0;
+//    curPos = 0;
+
+//    Serial.print("LABEL,Time,Desired Position,");
+//    if (COMPENSATION) Serial.println("Compensated,");
+//    else              Serial.println("Uncompensated,");
+
     delay(1000);
 }
 unsigned long timer = 0;
@@ -118,6 +124,7 @@ void loop()
 
     // Get desired angle
     desPos = HandleUserInput();
+//    desPos = test;
     desPosCPR = desPos * ENC_CPR / 360;
 
     // Calculate motor PWM duty cycle using PID
@@ -128,16 +135,16 @@ void loop()
 
     // Output to Motor
     WriteToPins();
-    //pwmWrite(PIN_MOT_PWMA, map(test, 0, 100, 0, 255));
+//    pwmWrite(PIN_MOT_PWMA, map(test, 0, 100, 0, 255));
     
     // Save current angle to EEPROM
     StoreNewAngle();
     PrintStuff();
-    // if (millis() - timer >= samplingRate) {
-    //     Serial.println(GetRPM(encPulseCount));
-    //     encPulseCount = 0;
-    // }
-    // if (millis() - timer < samplingRate)
-    //     return;
-    // timer = millis();
+//     if (millis() - timer >= samplingRate) {
+//         Serial.println(GetRPM(encPulseCount));
+//         encPulseCount = 0;
+//     }
+//     if (millis() - timer < samplingRate)
+//         return;
+//     timer = millis();
 }

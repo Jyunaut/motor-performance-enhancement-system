@@ -8,7 +8,7 @@
 inline int prevStateA;
 inline volatile long encPulseCount     = 0;
 inline volatile long measPWMPulseCount = 0;
-inline float samplingRate = 20;
+inline float samplingRate = 15;
 
 void PinInit();
 void ResetMeasPWM();
