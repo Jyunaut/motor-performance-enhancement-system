@@ -16,6 +16,76 @@ void NC::Initialize()
 void NC::EnableCompensation()
 {
     compensationEnabled = true;
+
+    // Set up lookup table in RAM from EEPROM
+    int i = 5;
+    while (i <= EEPROM.read(4)) {
+        if (i >= EEPROM.read(3))
+            NC::SaveToTable(EEPROM.read(i), EEPROM.read(1), EEPROM.read(i+1));
+        else
+            NC::SaveToTable(EEPROM.read(i), EEPROM.read(2) * 100, EEPROM.read(i+1));
+        Serial.println(EEPROM.read(i+1));
+        i = i + 2;
+    }
+
+    // Interpolate
+    bool skippingDeadband = true;
+    int lowestIndex = 0;
+    int tempIndex = 0;
+    int interpolateLength = 0;
+    for (int i = 0; i <= 100; i++) {
+        // Skip through deadband
+        if (skippingDeadband) {
+            if (NC::GetTablePWMFrequency(i) == 0) {
+                continue;
+            } else {
+                // Save the lowest index and the first range to begin interpolating
+                lowestIndex = i;
+                tempIndex = i;
+                skippingDeadband = false;
+            }
+        } else {
+            // Go through zeros and increment the length of the interpolation range
+            // Otherwise, linearly spread the difference of the low and high range
+            // across the length of the zeros
+            if (NC::GetTablePWMFrequency(i) == 0) {
+                interpolateLength++;
+                // Fill the rest of the values for the low-to-high frequency transition
+                if (i == EEPROM.read(0) - 1 && interpolateLength > 0) {
+                    for (int j = tempIndex + 1; j <= i; j++) {
+                        NC::SaveToTable(j, EEPROM.read(1), NC::GetTableCompensatedDutyCycle(tempIndex) + j - tempIndex);
+                    }
+                    interpolateLength = 0;
+                    tempIndex = i;
+                // Fill the rest of the end values with the maximum duty cycle
+                } else if (i >= 100 && interpolateLength > 0) {
+                    for (int j = tempIndex + 1; j <= i; j++) {
+                        NC::SaveToTable(j, DEFAULT_PWM_FREQUENCY, 100);
+                    }
+                }
+            } else if (NC::GetTablePWMFrequency(i) != 0 && interpolateLength > 0) {
+                float ratio = (NC::GetTableCompensatedDutyCycle(i) - NC::GetTableCompensatedDutyCycle(tempIndex)) / (float)(interpolateLength + 1);
+                for (int j = tempIndex + 1; j <= i - 1; j++) {
+                    NC::SaveToTable(j, i < EEPROM.read(0) ? EEPROM.read(1) : DEFAULT_PWM_FREQUENCY, NC::GetTableCompensatedDutyCycle(tempIndex) + round(ratio * (j - tempIndex)));
+                }
+                interpolateLength = 0;
+                tempIndex = i;
+            } else {
+                tempIndex = i;
+            }
+        }
+    }
+
+    Serial.println("Verify Interpolated Lookup Table");
+
+    // Verify Interpolated Lookup Table
+    for (int i = 0; i <= 100; i++) {
+        Serial.print(i);
+        Serial.print("\t\t\t");
+        Serial.print(NC::GetTablePWMFrequency(i));
+        Serial.print("\t\t\t");
+        Serial.println(NC::GetTableCompensatedDutyCycle(i));
+    }
 }
 
 void NC::DisableCompensation()
@@ -32,22 +102,22 @@ void NC::WriteToMotorDAQ()
 {
     if (compensationEnabled)
     {
-        SetPinFrequencySafe(PIN_PWMA, pwmFrequency);
+        SetPinFrequencySafe(PIN_PWMA, GetTablePWMFrequency(dutyCycle));
         if (dutyCycleSign == 0) {
-            pwmWrite(PIN_PWMA, map(dutyCycleCompensated, 0, 100, 0, 255));
+            pwmWrite(PIN_PWMA, map(GetTableCompensatedDutyCycle(dutyCycle), 0, 100, 0, 255));
             pwmWrite(PIN_PWMB, 0);
         } else if (dutyCycleSign == 1) {
             pwmWrite(PIN_PWMA, 0);
-            pwmWrite(PIN_PWMB, map(dutyCycleCompensated, 0, 100, 0, 255));
+            pwmWrite(PIN_PWMB, map(GetTableCompensatedDutyCycle(dutyCycle), 0, 100, 0, 255));
         }
     } else {
         SetPinFrequencySafe(PIN_PWMA, DEFAULT_PWM_FREQUENCY);
         if (dutyCycleSign == 0) {
-            pwmWrite(PIN_PWMA, abs(dutyCycle));
+            pwmWrite(PIN_PWMA, map(abs(dutyCycle), 0, 100, 0, 255));
             pwmWrite(PIN_PWMB, 0);
         } else if (dutyCycleSign == 1) {
             pwmWrite(PIN_PWMA, 0);
-            pwmWrite(PIN_PWMB, abs(dutyCycle));
+            pwmWrite(PIN_PWMB, map(abs(dutyCycle), 0, 100, 0, 255));
         }
     }
 }
@@ -56,22 +126,27 @@ void NC::WriteToMotor()
 {
     if (compensationEnabled)
     {
-        SetPinFrequencySafe(PIN_PWMA, pwmFrequency);
+        SetPinFrequencySafe(PIN_PWMA, GetTablePWMFrequency(abs(dutyCycle)));
         if (dutyCycle > 0) {
-            pwmWrite(PIN_PWMA, map(dutyCycleCompensated, 0, 100, 0, 255));
+            pwmWrite(PIN_PWMA, map(GetTableCompensatedDutyCycle(abs(dutyCycle)), 0, 100, 0, 255));
             pwmWrite(PIN_PWMB, 0);
         } else if (dutyCycle < 0) {
             pwmWrite(PIN_PWMA, 0);
-            pwmWrite(PIN_PWMB, map(dutyCycleCompensated, 0, 100, 0, 255));
+            pwmWrite(PIN_PWMB, map(GetTableCompensatedDutyCycle(abs(dutyCycle)), 0, 100, 0, 255));
+        } else {
+            pwmWrite(PIN_PWMA, 0);
+            pwmWrite(PIN_PWMB, 0);
         }
     } else {
-        SetPinFrequencySafe(PIN_PWMA, DEFAULT_PWM_FREQUENCY);
         if (dutyCycle > 0) {
             pwmWrite(PIN_PWMA, abs(map(dutyCycle, -100, 100, -255, 255)));
             pwmWrite(PIN_PWMB, 0);
         } else if (dutyCycle < 0) {
             pwmWrite(PIN_PWMA, 0);
             pwmWrite(PIN_PWMB, abs(map(dutyCycle, -100, 100, -255, 255)));
+        } else {
+            pwmWrite(PIN_PWMA, 0);
+            pwmWrite(PIN_PWMB, 0);
         }
     }
 }
@@ -117,17 +192,16 @@ void NC::SaveToTable(int index, int frequency, int dutyCycle)
 
 int NC::GetTablePWMFrequency(int desiredDutyCycle)
 {
+    if (desiredDutyCycle < 0 || desiredDutyCycle > 100)
+        return table[0][0];
     return table[desiredDutyCycle][0];
 }
 
 int NC::GetTableCompensatedDutyCycle(int desiredDutyCycle)
 {
+    if (desiredDutyCycle < 0 || desiredDutyCycle > 100)
+        return table[0][1];
     return table[desiredDutyCycle][1];
-}
-
-void NC::SaveTableToStorage()
-{
-
 }
 
 // This exists in order to call NC::Compensate for I2C
@@ -158,7 +232,7 @@ int HandleSerialInput()
 {
     String input = "";
 
-    while(Serial.available()) {
+    while (Serial.available()) {
         delay(2);
         char c = Serial.read();
         input += c;
@@ -171,11 +245,15 @@ int HandleSerialInput()
 
 void HandleI2CInput(int numBytes)
 {
-    while(Wire.available()) {
-        int num = Wire.read();
+    while (Wire.available()) {
+        uint8_t num = Wire.read();
         dutyCycleSign = num >> 7;
         dutyCycle = num & 0x7F;
     }
+
+    // while (Wire.available()) {
+    //     desiredPosition = Wire.read();
+    // }
 }
 
 void StoreNewAngle()

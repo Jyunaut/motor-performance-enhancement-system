@@ -10,7 +10,12 @@ void setup()
 
     NC::Initialize();
 
-    //StartupSequence();
+    if (MODE == DAQ_Compensated
+        || MODE == StandaloneSpeed_Compensated
+        || MODE == StandalonePosition_Compensated)
+        NC::EnableCompensation();
+
+    // StartupSequence();
 }
 
 void loop()
@@ -18,22 +23,16 @@ void loop()
     while (Serial.available()) {
         input = HandleSerialInput();
     }
-    if (MODE == OperatingMode::Calibration) {
-        CalibrationMode();
-    } else if (MODE == OperatingMode::DAQ) {
+    if (MODE == OperatingMode::DAQ || MODE == OperatingMode::DAQ_Compensated) {
         DAQMode();
-    } else if (MODE == OperatingMode::DAQ_Compensated) {
-        DAQMode_Compensated();
-    } else if (MODE == OperatingMode::StandaloneSpeed) {
+    } else if (MODE == OperatingMode::StandaloneSpeed || MODE == OperatingMode::StandaloneSpeed_Compensated) {
         StandaloneSpeedMode(input);
-    } else if (MODE == OperatingMode::StandaloneSpeed_Compensated) {
-        StandaloneSpeedMode_Compensated(input);
-    } else if (MODE == OperatingMode::StandalonePosition) {
+    } else if (MODE == OperatingMode::StandalonePosition || MODE == OperatingMode::StandalonePosition_Compensated) {
         StandalonePositionMode(input);
-    } else if (MODE == OperatingMode::StandalonePosition_Compensated) {
-        StandalonePositionMode_Compensated(input);
+    } else if (MODE == OperatingMode::Calibration) {
+        CalibrationMode();
     } else {
-        Serial.println("Invalid Operating Mode.");
+        Serial.println("Invalid Operating Mode. Re-check Properties.h file");
         while(1);
     }
 }
@@ -41,12 +40,10 @@ void loop()
 void DAQMode()
 {
     HandleI2CInput(1);
-    analogWrite(PIN_PWMA, map(dutyCycle, 0, 100, 0, 255));
-}
-
-void DAQMode_Compensated()
-{
-    NC::EnableCompensation();
+    NC::WriteToMotorDAQ();
+    Serial.print((int)dutyCycleSign);
+    Serial.print("\t\t");
+    Serial.println((int)dutyCycle);
 }
 
 void StandaloneSpeedMode(int input)
@@ -55,27 +52,10 @@ void StandaloneSpeedMode(int input)
     dutyCycle = input;
     NC::WriteToMotor();
     if (millis() - timer >= SAMPLE_TIME) {
-        Serial.print(input);
+        Serial.print((int)dutyCycle);
         Serial.print("Time (ms): ");
         Serial.print(millis());
         Serial.print("\t\t");
-        Serial.print("RPM: ");
-        Serial.println(NC::GetEncoderPulseCount() * 60 / ENC_CPR / (SAMPLE_TIME / (float)1000));
-        NC::ResetEncoderPulseCount();
-        timer = millis();
-    }
-}
-
-void StandaloneSpeedMode_Compensated(int input)
-{
-    NC::EnableCompensation();
-    static unsigned long timer;
-    dutyCycle = HandleSerialInput();
-    NC::Compensate();
-    analogWrite(PIN_PWMA, map(dutyCycleCompensated, 0, 100, 0, 255));
-    if (millis() - timer >= SAMPLE_TIME) {
-        Serial.print("Time (ms): ");
-        Serial.print(millis());
         Serial.print("RPM: ");
         Serial.println(NC::GetEncoderPulseCount() * 60 / ENC_CPR / (SAMPLE_TIME / (float)1000));
         NC::ResetEncoderPulseCount();
@@ -87,33 +67,32 @@ void StandalonePositionMode(int input)
 {
     currentPositionCPR = NC::GetEncoderPulseCount();
     currentPosition = map(currentPositionCPR, 0, ENC_CPR, 0, 360);
-    desiredPosition = HandleSerialInput();
+    desiredPosition = input;
     desiredPositionCPR = desiredPosition * ENC_CPR / 360;
     pid.CalculateDutyCycle();
-    NC::WriteToMotor();
-}
-
-void StandalonePositionMode_Compensated(int input)
-{
-    NC::EnableCompensation();
-    currentPositionCPR = NC::GetEncoderPulseCount();
-    currentPosition = map(currentPositionCPR, 0, ENC_CPR, 0, 360);
-    desiredPosition = HandleSerialInput();
-    desiredPositionCPR = desiredPosition * ENC_CPR / 360;
-    pid.CalculateDutyCycle();
-    NC::Compensate();
-    NC::WriteToMotor();
+    SetPinFrequencySafe(PIN_PWMA, 8000);
+    if (dutyCycle > 0) {
+        pwmWrite(PIN_PWMA, abs(dutyCycle));
+        pwmWrite(PIN_PWMB, 0);
+    }
+    else if (dutyCycle < 0) {
+        pwmWrite(PIN_PWMA, 0);
+        pwmWrite(PIN_PWMB, abs(dutyCycle));
+    }
+    Serial.print(desiredPosition);
+    Serial.print("\t");
+    Serial.println(currentPosition);
 }
 
 void CalibrationMode()
 {
-    const long sampleTime = 1000;
+    long sampleTime = 1000;
     unsigned long timer = 0;
-    int timeConstantPWM = 0;
     int lowestDutyCycle = 0;
+
     // Temporary Table: { index, duty cycle }
-    // int tempTable[51][2] = {0};
-    // dutyCycle = 0;
+    int tempTable[51][2] = {0};
+    dutyCycle = 0;
 
     // Calculate lowest PWM frequency
     if (MOTOR_TIME_CONSTANT > 0) {
@@ -129,126 +108,126 @@ void CalibrationMode()
         while(1);
     }
 
-    // // Generate table with normal operating PWM
-    // bool startedMoving = false;
-    // int i = 5, j = 0;
-    // int rpm = 0;
-    // int actualDutyCycle = 0;
-    // int sampleSkips = 0, sampleSkipCount = 0;
-    // while (i <= 100) {
-    //     SetPinFrequencySafe(PIN_PWMA, DEFAULT_PWM_FREQUENCY);
-    //     dutyCycle = i;
-    //     NC::WriteToMotor();
-    //     if (millis() - timer >= sampleTime) {
-    //         if (sampleSkipCount < sampleSkips) {
-    //             Serial.print(sampleSkipCount);
-    //             sampleSkipCount++;
-    //             timer = millis();
-    //             continue;
-    //         } else {
-    //             sampleSkipCount = 0;
-    //         }
-    //         rpm = (NC::GetEncoderPulseCount() * 60 / ENC_CPR / ((float)sampleTime / (float)1000)) / (sampleSkips + 1);
-    //         Serial.print("Duty Cycle: "); Serial.print(dutyCycle); Serial.print("\t");
-    //         Serial.print("RPM: "); Serial.print(rpm); Serial.print("\t\t");
-    //         Serial.print("Actual Duty Cycle: "); Serial.println(roundf((float)rpm / (float)MAX_RPM * 100));
-    //         if (rpm > MAX_RPM * 5 / 100) {
-    //             actualDutyCycle = roundf((float)rpm / (float)MAX_RPM * 100);
-    //             if (actualDutyCycle > 100)
-    //                 break;
-    //             tempTable[j][0] = actualDutyCycle;
-    //             tempTable[j][1] = i;
-    //             j++;
-    //             if (!startedMoving) {
-    //                 lowestDutyCycle = actualDutyCycle;
-    //                 EEPROM.update(0, lowestDutyCycle);
-    //                 startedMoving = true;
-    //             }
-    //         }
-    //         NC::ResetEncoderPulseCount();
-    //         timer = millis();
-    //         i = i + 5;
-    //     }
-    // }
-    // // Save Low Frequency Index
-    // EEPROM.update(3, 2*j+5);
-    // while (rpm > 0) {
-    //     pwmWrite(PIN_PWMA, 0);
-    //     pwmWrite(PIN_PWMB, 0);
-    //     rpm = NC::GetEncoderPulseCount() * 60 / ENC_CPR / ((float)sampleTime / (float)1000);
-    //     delay(1000);
-    // }
+    // Generate table with normal operating PWM
+    bool startedMoving = false;
+    int i = 5, j = 0;
+    int rpm = 0;
+    int actualDutyCycle = 0;
+    int sampleSkips = 0, sampleSkipCount = 0;
+    int prevDutyCycle = 0;
+    while (i <= 100) {
+        dutyCycle = i;
+        SetPinFrequencySafe(PIN_PWMA, DEFAULT_PWM_FREQUENCY);
+        NC::WriteToMotor();
+        if (millis() - timer >= sampleTime) {
+            if (sampleSkipCount < sampleSkips) {
+                Serial.print(sampleSkipCount);
+                sampleSkipCount++;
+                timer = millis();
+                continue;
+            } else {
+                sampleSkipCount = 0;
+            }
+            rpm = (NC::GetEncoderPulseCount() * 60 / ENC_CPR / ((float)sampleTime / (float)1000)) / (sampleSkips + 1);
+            Serial.print("Duty Cycle: "); Serial.print(dutyCycle); Serial.print("\t");
+            Serial.print("RPM: "); Serial.print(rpm); Serial.print("\t\t");
+            Serial.print("Actual Duty Cycle: "); Serial.println(roundf((float)rpm / (float)MAX_RPM * 100));
+            if (rpm > MAX_RPM * 20 / 100) {
+                actualDutyCycle = roundf((float)rpm / (float)MAX_RPM * 100);
+                if (actualDutyCycle > 100)
+                    break;
+                if (actualDutyCycle > prevDutyCycle) {
+                    tempTable[j][0] = actualDutyCycle;
+                    tempTable[j][1] = i;
+                    prevDutyCycle = actualDutyCycle;
+                    j++;
+                }
+                if (!startedMoving) {
+                    lowestDutyCycle = actualDutyCycle;
+                    EEPROM.update(0, lowestDutyCycle);
+                    startedMoving = true;
+                }
+            }
+            NC::ResetEncoderPulseCount();
+            timer = millis();
+            i = i + 5;
+        }
+    }
+    // Save Low Frequency Index
+    EEPROM.update(3, 2*j+5);
+    while (rpm > 0) {
+        pwmWrite(PIN_PWMA, 0);
+        pwmWrite(PIN_PWMB, 0);
+        rpm = NC::GetEncoderPulseCount() * 60 / ENC_CPR / ((float)sampleTime / (float)1000);
+        delay(1000);
+    }
 
-    // // Generate table with time constant PWM
-    // bool firstPass = true;
-    // i = 0;
-    // actualDutyCycle = 0;
-    // sampleSkips = 0;
-    // sampleSkipCount = 0;
-    // while (actualDutyCycle < lowestDutyCycle) {
-    //     SetPinFrequencySafe(PIN_PWMA, timeConstantPWM);
-    //     dutyCycle = i;
-    //     NC::WriteToMotor();
-    //     if (millis() - timer >= sampleTime) {
-    //         if (sampleSkipCount < sampleSkips) {
-    //             Serial.print(sampleSkipCount);
-    //             sampleSkipCount++;
-    //             timer = millis();
-    //             continue;
-    //         } else {
-    //             sampleSkipCount = 0;
-    //         }
-    //         rpm = (NC::GetEncoderPulseCount() * 60 / ENC_CPR / ((float)sampleTime / (float)1000)) / (sampleSkips + 1);
-    //         Serial.print("Duty Cycle: "); Serial.print(dutyCycle); Serial.print("\t");
-    //         Serial.print("RPM: "); Serial.print(rpm); Serial.print("\t\t");
-    //         Serial.print("Actual Duty Cycle: "); Serial.println(roundf((float)rpm / (float)MAX_RPM * 100));
-    //         actualDutyCycle = roundf((float)rpm / (float)MAX_RPM * 100);
-    //         if (rpm > MAX_RPM * 5 / 100 && actualDutyCycle > tempTable[j][0]) {
-    //             if (actualDutyCycle > lowestDutyCycle)
-    //                 break;
-    //             tempTable[j][0] = actualDutyCycle;
-    //             tempTable[j][1] = i;
-    //             j++;
-    //         }
-    //         NC::ResetEncoderPulseCount();
-    //         timer = millis();
-    //         i = i + 2;
-    //     }
-    // }
-    // // Save End of Key Value Index
-    // EEPROM.update(4, 2*j+4);
+    // Generate table with time constant PWM
+    bool firstPass = true;
+    i = 0;
+    actualDutyCycle = 0;
+    sampleSkips = 0;
+    sampleSkipCount = 0;
+    sampleTime = 3000;
+    prevDutyCycle = 0;
+    startedMoving = false;
+    while (actualDutyCycle < lowestDutyCycle) {
+        dutyCycle = i;
+        SetPinFrequencySafe(PIN_PWMA, EEPROM.read(1));
+        NC::WriteToMotor();
+        if (millis() - timer >= sampleTime) {
+            rpm = (NC::GetEncoderPulseCount() * 60 / ENC_CPR / ((float)sampleTime / (float)1000)) / (sampleSkips + 1);
+            Serial.print("Duty Cycle: "); Serial.print(dutyCycle); Serial.print("\t");
+            Serial.print("RPM: "); Serial.print(rpm); Serial.print("\t\t");
+            Serial.print("Actual Duty Cycle: "); Serial.println(roundf((float)rpm / (float)MAX_RPM * 100));
+            if (sampleSkipCount < sampleSkips) {
+                Serial.print(sampleSkipCount);
+                sampleSkipCount++;
+                timer = millis();
+                continue;
+            } else {
+                sampleSkipCount = 0;
+            }
+            actualDutyCycle = roundf((float)rpm / (float)MAX_RPM * 100);
+            if (rpm > MAX_RPM * 5 / 100 && actualDutyCycle > tempTable[j][0]) {
+                if (actualDutyCycle > lowestDutyCycle)
+                    break;
+                if (actualDutyCycle > prevDutyCycle) {
+                    tempTable[j][0] = actualDutyCycle;
+                    tempTable[j][1] = i;
+                    prevDutyCycle = actualDutyCycle;
+                    j++;
+                }
+                if (!startedMoving)
+                    startedMoving = true;
+            }
+            NC::ResetEncoderPulseCount();
+            timer = millis();
+            i = i + 1;
+        }
+    }
+    // Save End of Key Value Index
+    EEPROM.update(4, 2*j+4);
     
-    // i = 5;
-    // for (int k = 0; k <= j; k++) {
-    //     EEPROM.update(i, tempTable[k][0]);
-    //     EEPROM.update(i+1, tempTable[k][1]);
-    //     i = i + 2;
-    // }
+    i = 5;
+    for (int k = 0; k <= j; k++) {
+        EEPROM.update(i, tempTable[k][0]);
+        EEPROM.update(i+1, tempTable[k][1]);
+        i = i + 2;
+    }
 
-    // // ---------------------------------------------
+    // ---------------------------------------------
 
-    // // Verify Temporary Table
-    // for (int i = 0; i <= 50; i++) {
-    //     Serial.print(i); Serial.print("\t");
-    //     Serial.print(tempTable[i][0]); Serial.print("\t");
-    //     Serial.println(tempTable[i][1]);
-    // }
-
-    // // Verify EEPROM
-    // for (int i = 0; i <= 50; i++) {
-    //     Serial.print(i); Serial.print("\t");
-    //     Serial.println(EEPROM.read(i));
-    // }
-
-    // // Set up lookup table in RAM from EEPROM
-    // i = 5;
-    // while (i <= EEPROM.read(4)) {
-    //     if (i >= EEPROM.read(3))
-    //         NC::SaveToTable(EEPROM.read(i), EEPROM.read(1), EEPROM.read(i+1));
-    //     else
-    //         NC::SaveToTable(EEPROM.read(i), EEPROM.read(2) * 100, EEPROM.read(i+1));
-    //     i = i + 2;
-    // }
+    // Set up lookup table in RAM from EEPROM
+    i = 5;
+    while (i <= EEPROM.read(4)) {
+        if (i >= EEPROM.read(3))
+            NC::SaveToTable(EEPROM.read(i), EEPROM.read(1), EEPROM.read(i+1));
+        else
+            NC::SaveToTable(EEPROM.read(i), EEPROM.read(2) * 100, EEPROM.read(i+1));
+        Serial.println(EEPROM.read(i+1));
+        i = i + 2;
+    }
 
     // Verify Lookup Table
     for (int i = 0; i <= 100; i++) {
@@ -259,7 +238,7 @@ void CalibrationMode()
         Serial.println(NC::GetTableCompensatedDutyCycle(i));
     }
 
-    // Interpolate!
+    // Interpolate
     bool skippingDeadband = true;
     int lowestIndex = 0;
     int tempIndex = 0;
@@ -281,13 +260,26 @@ void CalibrationMode()
             // across the length of the zeros
             if (NC::GetTablePWMFrequency(i) == 0) {
                 interpolateLength++;
-            } else if (interpolateLength > 0) {
-                float ratio = (NC::GetTableCompensatedDutyCycle(i) - NC::GetTableCompensatedDutyCycle(tempIndex)) / (float)interpolateLength;
-                Serial.println(ratio);
+                // Fill the rest of the values for the low-to-high frequency transition
+                if (i == EEPROM.read(0) - 1 && interpolateLength > 0) {
+                    for (int j = tempIndex + 1; j <= i; j++) {
+                        NC::SaveToTable(j, EEPROM.read(1), NC::GetTableCompensatedDutyCycle(tempIndex) + j - tempIndex);
+                    }
+                    interpolateLength = 0;
+                    tempIndex = i;
+                // Fill the rest of the end values with the maximum duty cycle
+                } else if (i >= 100 && interpolateLength > 0) {
+                    for (int j = tempIndex + 1; j <= i; j++) {
+                        NC::SaveToTable(j, DEFAULT_PWM_FREQUENCY, 100);
+                    }
+                }
+            } else if (NC::GetTablePWMFrequency(i) != 0 && interpolateLength > 0) {
+                float ratio = (NC::GetTableCompensatedDutyCycle(i) - NC::GetTableCompensatedDutyCycle(tempIndex)) / (float)(interpolateLength + 1);
                 for (int j = tempIndex + 1; j <= i - 1; j++) {
-                    NC::SaveToTable(j, timeConstantPWM, NC::GetTableCompensatedDutyCycle(tempIndex) * ratio);
+                    NC::SaveToTable(j, i < EEPROM.read(0) ? EEPROM.read(1) : DEFAULT_PWM_FREQUENCY, NC::GetTableCompensatedDutyCycle(tempIndex) + round(ratio * (j - tempIndex)));
                 }
                 interpolateLength = 0;
+                tempIndex = i;
             } else {
                 tempIndex = i;
             }
@@ -314,7 +306,7 @@ void CalibrationMode()
 
         Max RPM: 300 RPM
         Normal Operating PWM: 8000 Hz
-        Time Constant PWM: 43 Hz
+        Time Constant PWM: 40 Hz
 
     1.  Generate table with normal operating PWM
     
@@ -348,7 +340,7 @@ void CalibrationMode()
         0: Deadband index
         1: Time Constant PWM Frequency
         2: Operating PWM Frequency
-        3: Low Frequency Index
+        3: Low Frequency Deadband Index
         4: End of Key Value Index
         5: Duty Cycle Index (7)
         6: Duty Cycle       (5)

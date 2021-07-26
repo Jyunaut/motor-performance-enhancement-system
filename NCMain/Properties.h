@@ -23,18 +23,18 @@ enum OperatingMode {
     StandaloneSpeed_Compensated,
     StandalonePosition,
     StandalonePosition_Compensated
-}; inline OperatingMode MODE = Calibration;
+}; inline OperatingMode MODE = StandaloneSpeed;
 
 // Position Control Parameters
-inline const float K_P       = 6;
+inline const float K_P       = 4;
 inline const float K_I       = 0;
 inline const float K_D       = 0;
 
 // Sample Time in milliseconds (ms)
-inline const int SAMPLE_TIME = 500;
+inline const int SAMPLE_TIME = 2000;
 
 // PWM Frequency in Hertz (Hz)
-inline const int DEFAULT_PWM_FREQUENCY = 8000;
+inline const int DEFAULT_PWM_FREQUENCY = 40;
 
 #endif
 

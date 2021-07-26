@@ -9,7 +9,7 @@ const bool COMPENSATION = false;
 const int TOLERANCE = 0; // In Degrees
 
 //3.5,0.001,0.05
-const float K_P = 6, K_I = 0.0000, K_D = 0;
+const float K_P = 8, K_I = 0.000, K_D = 15;
 
 // Position and speed values
 int   desPos           = 0;
