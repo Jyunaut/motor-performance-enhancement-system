@@ -9,13 +9,13 @@ void NC::Initialize()
 
     InitTimersSafe();
     SetPinFrequencySafe(PIN_PWMA, DEFAULT_PWM_FREQUENCY);
-
-    //EnableCompensation();
 }
 
 void NC::EnableCompensation()
 {
     compensationEnabled = true;
+
+    //return; // Debug
 
     // Set up lookup table in RAM from EEPROM
     int i = 5;
@@ -74,6 +74,14 @@ void NC::EnableCompensation()
                 tempIndex = i;
             }
         }
+    }
+
+    // Fill a third of the deadband with the lowest duty cycle
+    Serial.println(EEPROM.read(500));
+    int j = 0;
+    for (int i = EEPROM.read(500) - 1; j < (EEPROM.read(500) - 1) / 2; i--) {
+        NC::SaveToTable(i, EEPROM.read(1), EEPROM.read(501));
+        j++;
     }
 
     Serial.println("Verify Interpolated Lookup Table");
