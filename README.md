@@ -1,4 +1,4 @@
-# MSE Capstone 2021 - Embedded Motor Performance Enhancement System
+# MSE Capstone 2021 - Embedded Smart Motor Performance Enhancement System
 
 This project is for an Embedded Smart Motor Performance Enhancement System.
 
