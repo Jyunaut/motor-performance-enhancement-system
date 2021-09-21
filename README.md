@@ -10,6 +10,8 @@ The overall objective of this system is to compensate for the nonlinearities typ
 [CustomPWM](https://drive.google.com/file/d/1kZl4b6dBvbuqZpM3YXR_VyvR6hqdwDXl/view?usp=sharing)
 An open source custom PWM library to adjust PWM frequencies to specific values in real time.
 
+Credits to system on the Arduino forum. [Source](https://forum.arduino.cc/t/pwm-frequency-library/114988)
+
 ## Current Demos:
 ### [Integrated Robotic Arm Demo](https://drive.google.com/file/d/1WMokHUQ9lWXRpCI-F4r0GELZ6kqYKE1o/view?usp=sharing)
 This demo shows the motor nonlinearity compensator integrated with the DAQ and robot arm, performing the final pick and place operation.
